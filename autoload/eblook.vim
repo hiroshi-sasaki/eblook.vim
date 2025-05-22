@@ -30,6 +30,9 @@ scriptencoding utf-8
 let s:save_cpo = &cpo
 set cpo&vim
 
+" Save the original timeoutlen
+let s:save_timeoutlen = &timeoutlen
+
 " entryウィンドウの行数
 if !exists('eblook_entrywin_height')
   let eblook_entrywin_height = 4
@@ -168,6 +171,12 @@ augroup Eblook
 autocmd!
 execute "autocmd BufEnter " . s:entrybufname . "* call <SID>Entry_BufEnter()"
 execute "autocmd BufEnter " . s:contentbufname . "* call <SID>Content_BufEnter()"
+autocmd WinEnter * if &filetype != "eblook"
+                            \ | let &timeoutlen = s:save_timeoutlen
+                            \ | endif
+autocmd WinEnter * if &filetype == "eblook"
+                            \ | set timeoutlen=0
+                            \ | endif
 augroup END
 
 " eblook-vim-1.0.5までの辞書指定形式を読み込む
@@ -239,10 +248,8 @@ function! s:Entry_BufEnter()
   nnoremap <buffer> <silent> <Space> :call <SID>ScrollContent(1)<CR>
   nnoremap <buffer> <silent> <BS> :call <SID>ScrollContent(0)<CR>
   nnoremap <buffer> <silent> o :call <SID>MaximizeContentHeight(1)<CR>
-  nnoremap <buffer> <silent> r :call <SID>LoadWinHeights(1)<CR>
-  nnoremap <buffer> <silent> O :call <SID>GetAndFormatContent()<CR>
   nnoremap <buffer> <silent> p :call <SID>GoWindow(0)<CR>
-  nnoremap <buffer> <silent> q :call <SID>Quit()<CR>
+  nnoremap <buffer> <silent> <Esc> :call <SID>Quit()<CR>
   nnoremap <buffer> <silent> R :<C-U>call <SID>ListReferences(v:count)<CR>
   nnoremap <buffer> <silent> s :<C-U>call eblook#SearchInput(v:count, b:group, 0)<CR>
   nnoremap <buffer> <silent> S :<C-U>call <SID>SearchOtherGroup(v:count, b:group)<CR>
@@ -255,10 +262,27 @@ function! s:Entry_BufEnter()
     nnoremap <buffer> <silent> <C-RightMouse> :call <SID>History(-1)<CR>
     nnoremap <buffer> <silent> <C-LeftMouse> :call <SID>History(1)<CR>
   endif
+  setlocal norelativenumber
+  nnoremap <buffer> <silent> f :call <SID>ScrollContent(1)<CR>
+  nnoremap <buffer> <silent> b :call <SID>ScrollContent(0)<CR>
+  nnoremap <buffer> <silent> d :call <SID>ScrollHalfContent(1)<CR>
+  nnoremap <buffer> <silent> u :call <SID>ScrollHalfContent(0)<CR>
+  " Make only the windows within the split equal (https://stackoverflow.com/a/45591177/7388892)
+  nnoremap <buffer> <silent> r :new \| q<CR>
+  nnoremap <buffer> <silent> O :call <SID>MaximizeEntryHeight()<CR>
+  nnoremap <buffer> <silent> H :call <SID>History(-1)<CR>
+  nnoremap <buffer> <silent> L :call <SID>History(1)<CR>
+  nnoremap <buffer> <silent> j :call <SID>ScrollOneLine(1)<CR>
+  nnoremap <buffer> <silent> k :call <SID>ScrollOneLine(0)<CR>
+  nnoremap <buffer> <silent> g :call <SID>Top()<CR>
+  nnoremap <buffer> <silent> G :call <SID>Bottom()<CR>
+  nnoremap <buffer> <silent> q :call <SID>Quit()<CR>
 endfunction
 
 " contentバッファに入った時に実行。set nobuflistedする。
 function! s:Content_BufEnter()
+  " Fires immediately (e.g., 'd')
+  set timeoutlen=0
   set buftype=nofile
   set bufhidden=hide
   set noswapfile
@@ -286,10 +310,9 @@ function! s:Content_BufEnter()
   nnoremap <buffer> <silent> <Tab> :call search('<\d\+[\|!]')<CR>
   nnoremap <buffer> <silent> <S-Tab> :call search('<\d\+[\|!]', 'b')<CR>
   nnoremap <buffer> <silent> o :call <SID>MaximizeContentHeight(0)<CR>
-  nnoremap <buffer> <silent> r :call <SID>LoadWinHeights(0)<CR>
   nnoremap <buffer> <silent> O :call <SID>GetContentSub(1)<CR>
   nnoremap <buffer> <silent> p :call <SID>GoWindow(1)<CR>
-  nnoremap <buffer> <silent> q :call <SID>Quit()<CR>
+  nnoremap <buffer> <silent> <Esc> :call <SID>Quit()<CR>
   nnoremap <buffer> <silent> R :<C-U>call <SID>FollowReference(v:count, 1)<CR>
   nnoremap <buffer> <silent> s :<C-U>call eblook#SearchInput(v:count, b:group, 0)<CR>
   nnoremap <buffer> <silent> S :<C-U>call <SID>SearchOtherGroup(v:count, b:group)<CR>
@@ -304,6 +327,22 @@ function! s:Content_BufEnter()
     menu .3 PopUp.[eblook]\ SearchVisual :<C-U>call eblook#SearchVisual(v:count)<CR>
     menu .4 PopUp.-SEP_EBLOOK-	<Nop>
   endif
+  setlocal nonumber
+  setlocal norelativenumber
+  nnoremap <buffer> <silent> f <PageDown>
+  nnoremap <buffer> <silent> b <PageUp>
+  nnoremap <buffer> <silent> d <C-D>
+  nnoremap <buffer> <silent> u <C-U>
+  " Make only the windows within the split equal (https://stackoverflow.com/a/45591177/7388892)
+  nnoremap <buffer> <silent> r :new \| q<CR>
+  nnoremap <buffer> <silent> O :call <SID>MaximizeEntryHeight()<CR>
+  nnoremap <buffer> <silent> J <C-W>jj:call <SID>GetContent(0)<CR><C-W>k
+  nnoremap <buffer> <silent> K <C-W>jk:call <SID>GetContent(0)<CR><C-W>k
+  nnoremap <buffer> <silent> H :call <SID>History(-1)<CR>
+  nnoremap <buffer> <silent> L :call <SID>History(1)<CR>
+  nnoremap <buffer> <silent> g :call <SID>Top()<CR>
+  nnoremap <buffer> <silent> G :call <SID>Bottom()<CR>
+  nnoremap <buffer> <silent> q :call <SID>Quit()<CR>
 endfunction
 
 " プロンプトを出して、ユーザから入力された文字列を検索する
@@ -1523,6 +1562,8 @@ function! s:Quit()
   if s:SelectWindowByName(s:entrybufname . s:entrybufindex) >= 0
     hide
   endif
+  " Restore timeoutlen
+  let &timeoutlen = s:save_timeoutlen
   call delete(s:cmdfile)
 endfunction
 
@@ -1784,6 +1825,54 @@ function! eblook#PasteDictList(group)
   endfor
   execute 'normal! o\]' . "\<Esc>"
   let &paste = save_paste
+endfunction
+
+function! s:ScrollHalfContent(down)
+  if s:GoWindow(0) < 0
+    return
+  endif
+  if a:down
+    execute "normal! \<C-D>"
+  else
+    execute "normal! \<C-U>"
+  endif
+  call s:GoWindow(1)
+endfunction
+
+function! s:Top()
+  if s:GoWindow(0) < 0
+    return
+  endif
+  execute "normal! gg"
+  call s:GoWindow(1)
+endfunction
+
+function! s:Bottom()
+  if s:GoWindow(0) < 0
+    return
+  endif
+  execute "normal! G"
+  call s:GoWindow(1)
+endfunction
+
+function! s:ScrollOneLine(down)
+  if s:GoWindow(0) < 0
+    return
+  endif
+  if a:down
+    execute "normal! \<C-E>"
+  else
+    execute "normal! \<C-Y>"
+  endif
+  call s:GoWindow(1)
+endfunction
+
+function! s:MaximizeEntryHeight()
+  if s:GoWindow(1) < 0
+    return
+  endif
+  wincmd _
+  call s:GoWindow(1)
 endfunction
 
 let &cpo = s:save_cpo
